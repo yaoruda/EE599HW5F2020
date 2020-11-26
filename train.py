@@ -31,7 +31,7 @@ learning_rate = 0.01
 num_epochs = 100
 offset_random = False
 
-name = 'seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}, offset_random={}'.format(
+name = 'new-seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}, offset_random={}'.format(
     train_seq_length,
     hidden_size,
     num_layers,
