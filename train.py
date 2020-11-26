@@ -22,15 +22,16 @@ def Softmax(x):
 ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 # default `log_dir` is "runs" - we'll be more specific here
-train_seq_length = 20
+train_seq_length = 10
 hidden_size = 128
 num_layers = 2
 bidirectional = True
 batch_size = 100
 learning_rate = 0.01
 num_epochs = 100
+offset_random = False
 
-name = 'seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}'.format(
+name = 'seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}, offset_random={}'.format(
     train_seq_length,
     hidden_size,
     num_layers,
@@ -38,8 +39,10 @@ name = 'seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}'.for
     batch_size,
     learning_rate,
     num_epochs,
+    offset_random
 )
 writer = SummaryWriter(f'runs/hw5/{name}')
+
 
 class Model(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, bidirectional):
@@ -81,7 +84,7 @@ class Model(nn.Module):
         return out
 
 
-dataset = Audio_Dataset(train_seq_length)
+dataset = Audio_Dataset(train_seq_length, offset_random)
 train_dataset = Audio_train(dataset.X_train, dataset.y_train)
 val_dataset = Audio_val(dataset.X_val, dataset.y_val)
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -100,20 +103,20 @@ summary(
     model,
     input_size=(train_seq_length, 64)
 )
-writer.add_graph(model, torch.zeros(batch_size, train_seq_length, 64))
+# writer.add_graph(model, torch.zeros(batch_size, train_seq_length, 64))
 
 loss_func = nn.MSELoss()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 ### TRAIN
-model.train()
 best_test_acc = 0.0
 best_model_epoch = 0
 torch.save(model, f'./runs/hw5/{name}/best_model.pth')
 iter_count = 0
 
 for epoch in range(num_epochs):
+    model.train()
     train_loss = 0
     train_acc = 0
     i = 0
@@ -132,7 +135,7 @@ for epoch in range(num_epochs):
         # acc part
         for item in range(0, batch_size):
             predict_in_length = torch.argmax(yhat[item], axis=1)
-            count = np.bincount(predict_in_length.numpy())
+            count = np.bincount(predict_in_length.cpu().numpy())
             predict = np.argmax(count)
             if predict == torch.argmax(y[item], axis=1)[0]:
                 train_acc += 1
@@ -165,7 +168,7 @@ for epoch in range(num_epochs):
         # acc part
         for item in range(0, batch_size):
             predict_in_length = torch.argmax(yhat[item], axis=1)
-            count = np.bincount(predict_in_length.numpy())
+            count = np.bincount(predict_in_length.cpu().numpy())
             predict = np.argmax(count)
             if predict == torch.argmax(y[item], axis=1)[0]:
                 test_acc += 1
@@ -180,7 +183,7 @@ for epoch in range(num_epochs):
             iter_test_count += 1
             sum_value = [0, 0, 0]
             for it, value in enumerate(yhat[item]):
-                sum_value += Softmax(value.numpy())
+                sum_value += Softmax(value.cpu().numpy())
             sum_value /= train_seq_length
             softmax_saver['y'].append(sum_value[0])
             softmax_saver['language'].append('english')

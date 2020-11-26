@@ -12,12 +12,12 @@ import librosa
 
 class Audio_Dataset:
 
-    def __init__(self, seq_length):
+    def __init__(self, seq_length, offset_random):
         self.dir = Config['data_dir']
         self.seq_length = seq_length
-        X_english, y_englist = self.get_MFCC_features_labels('english', N_files=40, duration=self.seq_length)
-        X_hindi, y_hindi = self.get_MFCC_features_labels('hindi', N_files=40, duration=self.seq_length)
-        X_mandarin, y_mandarin = self.get_MFCC_features_labels('mandarin', N_files=40, duration=self.seq_length)
+        X_english, y_englist = self.get_MFCC_features_labels('english', offset_random, N_files=40, duration=self.seq_length)
+        X_hindi, y_hindi = self.get_MFCC_features_labels('hindi', offset_random, N_files=40, duration=self.seq_length)
+        X_mandarin, y_mandarin = self.get_MFCC_features_labels('mandarin', offset_random, N_files=40, duration=self.seq_length)
         self.num_seq = X_english.shape[0] // seq_length
         self.X_english = X_english.reshape((self.num_seq, seq_length, 64))
         self.y_english = y_englist.reshape((self.num_seq, seq_length, 1))
@@ -37,13 +37,15 @@ class Audio_Dataset:
         self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X, y, test_size=0.2)
 
 
-    def get_MFCC_features_labels(self, language, N_files, duration):
+    def get_MFCC_features_labels(self, language, offset_random, N_files, duration):
         all_features_for_this_language = None
 
         for i in range(1, N_files+1):
             file_dir = os.path.join(self.dir, 'train_'+language, '{}_{:04d}.wav'.format(language, i))
-            # offset = random.randint(0, 600 - duration)
-            offset = 100
+            if offset_random:
+                offset = random.randint(0, 600 - duration)
+            else:
+                offset = 100
             y, sr = librosa.load(file_dir, sr=16000, offset=offset, duration=duration)
             # if len(y) == 0:
             time.sleep(0)
