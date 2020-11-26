@@ -22,7 +22,7 @@ def Softmax(x):
 ts = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 # default `log_dir` is "runs" - we'll be more specific here
-train_seq_length = 10
+train_seq_length = 20
 hidden_size = 128
 num_layers = 2
 bidirectional = True
@@ -41,24 +41,24 @@ name = 'seq_len={}, hidden={}, layers={}, bid={}, batch={}, lr={}, epoch={}, off
     num_epochs,
     offset_random
 )
+
+# name = 'test'
 writer = SummaryWriter(f'runs/hw5/{name}')
 
 
 class Model(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, bidirectional):
         super(Model, self).__init__()
-
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.bidirectional = bidirectional
-
         self.rnn = nn.GRU(
             input_size=self.input_size,
             hidden_size=self.hidden_size,
             num_layers=num_layers,
             dropout=0.2,
-            batch_first=False,
+            batch_first=True,
             bidirectional=self.bidirectional
         )
         if self.bidirectional:
@@ -66,21 +66,17 @@ class Model(nn.Module):
         else:
             self.fc = nn.Linear(self.hidden_size, self.output_size)
         self.dropout = nn.Dropout(0.2)
-
-    # create function to init state
     def init_hidden(self, batch_size):
         number = 1
         if self.bidirectional:
             number = 2
         return torch.zeros(number * num_layers, batch_size, self.hidden_size)
-
     def forward(self, x):
-        batch_size = x.size(1)
+        batch_size = x.size(0)
         h = self.init_hidden(batch_size).to(device)
         out, h = self.rnn(x, h)
         out = self.dropout(out)
         out = self.fc(out)
-        # return out, h
         return out
 
 
@@ -106,15 +102,11 @@ summary(
 # writer.add_graph(model, torch.zeros(batch_size, train_seq_length, 64))
 
 loss_func = nn.MSELoss()
-
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-### TRAIN
 best_test_acc = 0.0
 best_model_epoch = 0
 torch.save(model, f'./runs/hw5/{name}/best_model.pth')
 iter_count = 0
-
 for epoch in range(num_epochs):
     model.train()
     train_loss = 0
@@ -178,6 +170,7 @@ for epoch in range(num_epochs):
             'y': [],
             'x': [],
             'language': [],
+            'true_label': [],
         }
         for item in range(0, batch_size):
             iter_test_count += 1
@@ -185,15 +178,24 @@ for epoch in range(num_epochs):
             for it, value in enumerate(yhat[item]):
                 sum_value += Softmax(value.cpu().numpy())
             sum_value /= train_seq_length
+            if torch.argmax(y[item], axis=1)[0] == 0:
+                true_label = 'english'
+            if torch.argmax(y[item], axis=1)[0] == 1:
+                true_label = 'hindi'
+            if torch.argmax(y[item], axis=1)[0] == 2:
+                true_label = 'mandarin'
             softmax_saver['y'].append(sum_value[0])
             softmax_saver['language'].append('english')
             softmax_saver['x'].append(iter_test_count)
+            softmax_saver['true_label'].append(true_label)
             softmax_saver['y'].append(sum_value[1])
             softmax_saver['language'].append('hindi')
             softmax_saver['x'].append(iter_test_count)
+            softmax_saver['true_label'].append(true_label)
             softmax_saver['y'].append(sum_value[2])
             softmax_saver['language'].append('mandarin')
             softmax_saver['x'].append(iter_test_count)
+            softmax_saver['true_label'].append(true_label)
 
 
         # if (j > 30) and not (j % 10):
@@ -211,13 +213,28 @@ for epoch in range(num_epochs):
     acc = softmax_saver
     acc = pd.DataFrame(acc)
     import matplotlib.pyplot as plt
-    plt.figure()
-    # plt.plot(softmax_saver['x'], softmax_saver['0'], name=)
-    sns.lineplot(x="x", y="y", data=acc, hue='language')
-    plt.title(f'ep={epoch} in val')
-    plt.xlabel('time')
-    plt.ylabel('prob.')
+    # plt.figure()
+    # sns.lineplot(x="x", y="y", data=acc, hue='language')
+    # plt.title(f'ep={epoch} in val')
+    # plt.xlabel('time')
+    # plt.ylabel('prob.')
+    # plt.show()
+    ######
+    fig1, f1_axes = plt.subplots(ncols=3, nrows=1, figsize=(14, 4))
+    sns.lineplot(x="x", y="y", data=acc[(acc['true_label']=='english')], hue='language', ax=f1_axes[0])
+    sns.lineplot(x="x", y="y", data=acc[(acc['true_label']=='hindi')], hue='language', ax=f1_axes[1])
+    sns.lineplot(x="x", y="y", data=acc[(acc['true_label']=='mandarin')], hue='language', ax=f1_axes[2])
+    f1_axes[0].set_xlabel("time", size=15)
+    f1_axes[1].set_xlabel("time", size=15)
+    f1_axes[2].set_xlabel("time", size=15)
+    f1_axes[0].set_ylabel("prob.", size=15)
+    f1_axes[1].set_ylabel("prob.", size=15)
+    f1_axes[2].set_ylabel("prob.", size=15)
+    f1_axes[0].set_title(f"true label is english ep={epoch}", size=15)
+    f1_axes[1].set_title(f"true label is hindi ep={epoch}", size=15)
+    f1_axes[2].set_title(f"true label is mandarin ep={epoch}", size=15)
     plt.show()
+    #####
 
     # Save best model
     this_test_acc = test_acc / len(val_dataloader.dataset)

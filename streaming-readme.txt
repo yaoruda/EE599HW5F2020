@@ -1,0 +1,1 @@
+My streaming model can init by no params. I used GRU: batch_first=False,
